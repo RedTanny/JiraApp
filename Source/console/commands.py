@@ -28,6 +28,7 @@ class ConsoleCommands:
             'clear': self._cmd_clear,
             'quit': self._cmd_quit,
             'exit': self._cmd_quit,
+            'keys': self._cmd_keys
         }
     
     def execute_command(self, command: str, args: List[str] = None) -> bool:
@@ -82,6 +83,7 @@ class ConsoleCommands:
   /tools         - List available MCP tools
   /status        - Show system status
   /clear         - Clear console screen
+  /keys          - Show enhanced input key bindings
   /quit          - Exit the application
 
 [bold]Natural Language:[/bold]
@@ -106,7 +108,8 @@ class ConsoleCommands:
             'tools': "List all available MCP tools and their descriptions.",
             'status': "Show current system status, active tools, and connection health.",
             'clear': "Clear the console screen for better readability.",
-            'quit': "Exit the console application safely."
+            'quit': "Exit the console application safely.",
+            'keys': "Show enhanced input key bindings and navigation shortcuts."
         }
         
         help_text = f"[bold cyan]Command: /{command}[/bold cyan]\n\n{command_help.get(command, 'No help available for this command.')}"
@@ -167,4 +170,36 @@ class ConsoleCommands:
         """Exit the application."""
         self.console.print("[yellow]Exiting MCP JIRA Console...[/yellow]")
         # The main loop should handle the actual exit
-        raise SystemExit(0) 
+        raise SystemExit(0)
+    
+    def _cmd_keys(self, *args) -> None:
+        """Show enhanced input key bindings."""
+        if hasattr(self.orchestrator, 'console_ui') and hasattr(self.orchestrator.console_ui, 'enhanced_input'):
+            self.orchestrator.console_ui.enhanced_input.show_help()
+        else:
+            # Fallback help if enhanced input is not available
+            help_text = """
+[bold cyan]Readline Input Key Bindings:[/bold cyan]
+
+[bold]Navigation:[/bold]
+  ↑/↓          Navigate command history (working!)
+  Ctrl+P/N     Previous/Next command (alternative to arrows)
+  Home/End     Jump to start/end of line
+  Ctrl+←/→     Jump between words
+  
+[bold]History Search:[/bold]
+  Ctrl+R       Start reverse search through history
+  Ctrl+S       Forward search through history
+  Ctrl+G       Cancel current search
+  
+[bold]Line Editing:[/bold]
+  Ctrl+U       Clear current line
+  Ctrl+W       Delete word before cursor
+  Tab          Auto-complete commands
+  
+[bold]Other:[/bold]
+  Ctrl+L       Clear screen
+  Ctrl+C       Interrupt current operation
+  Ctrl+D       End of input (exit)
+            """
+            self.console.print(help_text) 

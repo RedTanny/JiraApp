@@ -113,6 +113,7 @@ async def search_jira_issues(jql: str, max_results: int = 10) -> str:
         jira = get_jira_client()
         
         try:
+            jql = jql.strip('"')
             issues = jira.search_issues(jql, maxResults=max_results)
             logger.info(f"[JIRA] Found {len(issues)} issues")
         except Exception as e:

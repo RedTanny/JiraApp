@@ -110,6 +110,35 @@ The console UI provides an interactive interface for user interaction, status di
 - **Status Display**: `StatusIndicator` - shows execution status, timing, and progress with emoji indicators
 - **Built-in Commands**: `/help`, `/tools`, `/status`, `/clear` for system navigation
 
+### **View System**
+The console UI includes a specialized view system that automatically renders different data types using appropriate visual formats based on the MCP tool that generated the data.
+
+#### **View Architecture**
+- **ViewManager**: Routes events to specialized view renderers based on tool names
+- **BaseView**: Abstract interface for all specialized views
+- **Specialized Views**: Tool-specific renderers (e.g., `JiraIssueView`, `JiraSearchView`)
+- **Generic Fallback**: Default view for unknown tool types or when specialized views fail
+
+#### **View Registry & Configuration**
+Views are configured via config files for flexibility:
+```yaml
+views:
+  get_jira_issue: JiraIssueView
+  search_issues: JiraSearchView
+  get_epic: JiraEpicView
+  search_confluence: ConfluenceSearchView
+```
+
+#### **Specialized View Examples**
+- **JIRA Issue View**: Formatted display with issue header, metadata table, and description
+- **Search Results View**: Clean table format for multiple items
+- **Generic View**: Fallback table display for any structured data
+
+#### **Error Handling**
+- Views gracefully handle malformed data
+- Error messages displayed at bottom of view content
+- Always fallback to generic view if specialized view fails
+
 ### **Key Features**
 - **Interactive Loop**: Continuous user input with `mcp_jira>` prompt
 - **Transparent Event Display**: No parsed events shown to user (clean interface)
@@ -118,6 +147,7 @@ The console UI provides an interactive interface for user interaction, status di
 - **Generic Table Generation**: Dynamic table creation for any structured data (JIRA tickets, content lists, etc.)
 - **Command History**: Basic command history and navigation
 - **Error Handling**: User-friendly error messages and status feedback
+- **Specialized Views**: Contextually appropriate displays for different data types
 
 ### **User Experience Flow**
 1. **Input**: User types natural language request or built-in command
@@ -159,6 +189,13 @@ The console UI integrates with the orchestrator through a clean interface:
 3) **Status Display**: Console shows real-time status and timing during execution
 4) **Result Formatting**: Console formats orchestrator results into clean tables and status messages
 5) **Error Handling**: Console provides user-friendly error messages and recovery options
+6) **Specialized Views**: Console automatically selects appropriate view renderers based on tool names
+
+### **View System Integration**
+- **Automatic Routing**: Events are automatically routed to specialized views based on `event.tool_name`
+- **Fallback Handling**: If no specialized view exists or rendering fails, falls back to generic table view
+- **Configuration-Driven**: View mappings configured via config files for easy customization
+- **Backward Compatible**: Existing generic table display functionality preserved
 
 ### **Built-in Commands**
 - **`/help`**: Display available commands and usage
@@ -188,12 +225,20 @@ servers:
     cwd: "/home/stanny/projects/mcp_jira"
     env: {}
     use_persistent_session: false
+
+# Optional: View system configuration
+views:
+  get_jira_issue: JiraIssueView
+  search_issues: JiraSearchView
+  get_epic: JiraEpicView
+  search_confluence: ConfluenceSearchView
 ```
 
 Notes
 - JSON is also supported with the same structure.
 - If `command` is omitted, the layer will not launch the server and will only attempt to connect.
 - Duplicate tool names across servers are allowed but will emit a warning; last one wins.
+- View configuration is optional; if omitted, all tools use the generic view.
 
 ## Error Handling & Resilience
 
@@ -223,4 +268,19 @@ Notes
 - Integration tests can point to local MCP servers (dev) using the provided example config
 
 ## Roadmap
+
+### **Phase 1: Core View System**
+- Implement `BaseView` interface and `ViewManager` class
+- Create `JiraIssueView` for the working `get_jira_issue` tool
+- Integrate view system with existing console UI
+
+### **Phase 2: Extended Views**
+- Add `JiraSearchView` for search results
+- Implement `ConfluenceSearchView` for Confluence content
+- Add configuration file support for view mappings
+
+### **Phase 3: Enhanced User Experience**
+- Improve view formatting and styling
+- Add more specialized views for other tool types
+- Performance optimization and error handling improvements
 

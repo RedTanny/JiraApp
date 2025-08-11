@@ -1,37 +1,65 @@
 """
-Main console UI class for MCP JIRA system.
+Console UI for interactive user interface.
 
-Handles user interaction, command processing, and orchestrator integration.
+Provides an interactive console interface with command processing,
+status display, and result formatting.
 """
 
 import sys
-from typing import Optional, Any
+from typing import Any
 from rich.console import Console
-from rich.prompt import Prompt
 from rich.panel import Panel
-from rich.text import Text
-
+from rich.prompt import Prompt
+from .commands import ConsoleCommands
 from .status_indicator import StatusIndicator
 from .table_reporter import TableReporter
-from .commands import ConsoleCommands
+from .view_manager import ViewManager
+from .history_manager import HistoryManager
+from .readline_input import ReadlineInput
 
 
 class ConsoleUI:
-    """Main console interface for the MCP JIRA system."""
+    """Interactive console interface for the MCP JIRA application."""
     
     def __init__(self, orchestrator: Any = None):
-        self.orchestrator = orchestrator
         self.console = Console()
-        self.status = StatusIndicator(self.console)
+        self.orchestrator = orchestrator
+        self.running = True
+        
+        # Initialize components
         self.table_reporter = TableReporter(self.console)
-        self.commands = ConsoleCommands(self.console, orchestrator)
+        self.status = StatusIndicator(self.console)
+        self.commands = ConsoleCommands(self.console, self.orchestrator)
+        
+        # Initialize view system
+        self.view_manager = ViewManager(self.console, self.table_reporter)
+        self._register_specialized_views()
+        
+        # Initialize history system
+        self.history_manager = HistoryManager()
+        self.enhanced_input = ReadlineInput(self.console, self.history_manager)
         
         # Console settings
         self.prompt = "mcp_jira> "
-        self.running = False
         
         # Welcome message
         self._show_welcome()
+    
+    def _register_specialized_views(self) -> None:
+        """Register specialized views for different tool types."""
+        from .jira_issue_view import JiraIssueView
+        from .jira_search_view import JiraSearchView
+        
+        # Register JIRA issue view
+        jira_issue_view = JiraIssueView(self.console, self.table_reporter)
+        self.view_manager.register_view("get_jira_issue", jira_issue_view)
+        
+        # Register JIRA search view
+        jira_search_view = JiraSearchView(self.console, self.table_reporter)
+        self.view_manager.register_view("search_jira_issues", jira_search_view)
+        
+        # TODO: Add more specialized views as they are implemented
+        # self.view_manager.register_view("get_epic", JiraEpicView(self.console, self.table_reporter))
     
     def _show_welcome(self) -> None:
         """Display welcome message."""
@@ -58,8 +86,8 @@ Type [bold]/help[/bold] to see available commands, or type your request in natur
         try:
             while self.running:
                 try:
-                    # Get user input
-                    user_input = Prompt.ask(self.prompt)
+                    # Get user input with enhanced history support
+                    user_input = self.enhanced_input.get_input(self.prompt)
                     
                     if not user_input.strip():
                         continue
@@ -158,7 +186,7 @@ Type [bold]/help[/bold] to see available commands, or type your request in natur
             self._display_event_result(event)
     
     def _display_event_result(self, event: Any) -> None:
-        """Display the result of a single event."""
+        """Display the result of a single event using specialized views."""
         event_type = event.command_type.value
         event_tool = event.tool_name + " " + ", ".join(event.tool_args)
         
@@ -166,15 +194,9 @@ Type [bold]/help[/bold] to see available commands, or type your request in natur
         header_text = f"[bold cyan]{event_type}[/bold cyan]: {event_tool}"
         self.console.print(header_text)
         
-        # TODO: This is where we'd display actual results from MCP execution
-        # For now, just show the event data
+        # Use specialized view manager to render results
         if hasattr(event, 'result') and event.result:
-            if isinstance(event.result, (list, dict)):
-                # Display as table if it's structured data
-                self.table_reporter.display_table(event.result, title=f"{event_type} Results")
-            else:
-                # Display as text
-                self.console.print(f"Result: {event.result}")
+            self.view_manager.render_event(event, event.result)
         else:
             self.console.print(f"[dim]No results available for {event_type}[/dim]")
         
