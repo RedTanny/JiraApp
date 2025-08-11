@@ -1,0 +1,11 @@
+servers:
+  - name: jira
+    sse_url: "http://localhost:8003/sse/"
+    # Optional: launch the server as a child process
+    command: ["python", "MCP/jira_mcp_server.py"]
+    cwd: "/home/stanny/projects/mcp_jira"
+    env: {}      
+    ready_timeout_s: 10
+    auto_restart: false
+
+

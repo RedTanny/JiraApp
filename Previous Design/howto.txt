@@ -1,0 +1,250 @@
+# JIRA MCP Server Setup Guide
+
+## Overview
+This guide documents how to set up a working JIRA MCP (Model Context Protocol) server that can be used to query JIRA issues and search for tickets using JQL.
+
+## Prerequisites
+- Linux system (tested on Fedora 6.15.3-200.fc42.x86_64)
+- Conda/Miniconda installed
+- Access to a JIRA instance with API token
+- Python 3.12+
+
+## Environment Setup
+
+### 1. Create Conda Environment
+```bash
+conda create -n llama_mcp_jira python=3.12
+conda activate llama_mcp_jira
+```
+
+### 2. Install Dependencies
+```bash
+pip install jira requests mcp
+```
+
+### 3. Set Environment Variables
+Create a `.env` file or export the following:
+```bash
+export JIRA_SERVER="YOUR_JIRA_SERVER_URL_HERE"
+export JIRA_API_TOKEN="YOUR_JIRA_API_TOKEN_HERE"
+```
+
+## Configuration Files Created
+
+### 1. Main Server: jira_mcp_server_simple.py
+- Single-process HTTP server implementing MCP protocol directly
+- Runs on http://localhost:8003/sse
+- Handles initialize, tools/list, and tools/call methods
+- Uses Bearer authentication for JIRA API
+
+### 2. Test Client: jira_mcp_test_client.py
+- Simple test client to verify server functionality
+- Tests all MCP methods and JIRA integration
+
+### 3. Working JIRA Script: scripts/working_jira_bearer.py
+- Reference implementation showing correct Bearer authentication
+- Used to validate JIRA connectivity before building MCP server
+
+## Running the Server
+
+### 1. Activate Environment
+```bash
+conda activate llama_mcp_jira
+```
+
+### 2. Start the JIRA MCP Server
+```bash
+python jira_mcp_server_simple.py
+```
+
+Expected output:
+```
+INFO:__main__:Starting Simple JIRA MCP Server on http://localhost:8003
+INFO:__main__:SSE endpoint: http://localhost:8003/sse
+```
+
+### 3. Verify Server is Running
+```bash
+# Check if server responds to initialize
+curl -X POST http://localhost:8003/sse -H "Content-Type: application/json" -d '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "test", "version": "1.0"}}}'
+
+# Expected response:
+# {"jsonrpc": "2.0", "id": 1, "result": {"protocolVersion": "2024-11-05", "capabilities": {"experimental": {}, "tools": {"listChanged": false}}, "serverInfo": {"name": "jira-mcp-server", "version": "1.0.0"}}}
+```
+
+## Testing the Server
+
+### 1. Run the Test Client
+```bash
+python jira_mcp_test_client.py
+```
+
+Expected output:
+```
+=== Testing JIRA MCP Server ===
+
+1. Testing initialize...
+   Status: 200
+   Server: jira-mcp-server v1.0.0
+   ✓ Initialize successful
+
+2. Testing tools/list...
+   Status: 200
+   Found 2 tools:
+     - get_jira_issue: Get details of a specific JIRA issue by key
+     - search_jira_issues: Search for JIRA issues using JQL
+   ✓ Tools list successful
+
+3. Testing get_jira_issue...
+   Status: 200
+   Issue: NCS-8540 - Poc Scalling Ceph MDS
+   Status: SAFe Backlog
+   Assignee: Yael Azulay (EXT-Nokia)
+   ✓ JIRA issue retrieval successful
+
+4. Testing search_jira_issues...
+   Status: 200
+   Search results preview: JIRA Search Results (3 issues): ...
+   ✓ JIRA search successful
+
+✅ All tests completed!
+```
+
+### 2. Manual API Testing
+```bash
+# List available tools
+curl -X POST http://localhost:8003/sse -H "Content-Type: application/json" -d '{"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}'
+
+# Get specific JIRA issue
+curl -X POST http://localhost:8003/sse -H "Content-Type: application/json" -d '{"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "get_jira_issue", "arguments": {"issue_key": "NCS-8540"}}}'
+
+# Search JIRA issues
+curl -X POST http://localhost:8003/sse -H "Content-Type: application/json" -d '{"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "search_jira_issues", "arguments": {"jql": "project = NCS AND status = '\''SAFe Backlog'\''", "max_results": 3}}}'
+```
+
+## Available Tools
+
+### 1. get_jira_issue
+**Purpose**: Get details of a specific JIRA issue by key
+**Parameters**:
+- `issue_key` (string): JIRA issue key (e.g., "NCS-8540")
+**Returns**: Formatted JSON with issue details including summary, status, assignee, etc.
+
+### 2. search_jira_issues
+**Purpose**: Search for JIRA issues using JQL (JIRA Query Language)
+**Parameters**:
+- `jql` (string): JQL query string
+- `max_results` (integer, optional): Maximum number of results to return (default: 10)
+**Returns**: List of matching issues with their details
+
+## Example JQL Queries
+```
+# Find issues in specific project and status
+project = NCS AND status = 'SAFe Backlog'
+
+# Find issues assigned to specific user
+assignee = 'Yael Azulay (EXT-Nokia)'
+
+# Find recently updated issues
+updated >= -7d AND project = NCS
+
+# Find issues by priority
+priority = High AND project = NCS
+```
+
+## Llama Stack Integration (Optional)
+
+### 1. Start Llama Stack
+```bash
+conda activate llama_mcp_jira
+llama stack run /home/stanny/.local/lib/python3.13/site-packages/llama_stack/templates/ollama/run.yaml --image-type conda
+```
+
+### 2. Register JIRA MCP Server as Toolgroup
+curl -X POST http://localhost:8321/v1/toolgroups -H "Content-Type: application/json" -d '{"toolgroup_id": "jira_mcp_group", "provider_id": "model-context-protocol", "mcp_endpoint": {"uri": "http://localhost:8003/sse"}}'
+
+
+### Common Issues and Solutions
+
+1. **ModuleNotFoundError: No module named 'jira'**
+   ```bash
+   conda activate llama_mcp_jira
+   pip install jira
+   ```
+
+2. **Server not responding on port 8003**
+   ```bash
+   # Check if server is running
+   ps aux | grep jira_mcp_server_simple
+   
+   # Kill old processes
+   pkill -f jira_mcp_server_simple
+   
+   # Restart server
+   python jira_mcp_server_simple.py
+   ```
+
+3. **JIRA authentication errors**
+   - Verify your JIRA_API_TOKEN is correct
+   - Check JIRA_SERVER URL is accessible
+   - Test with the working script:
+     ```bash
+     python scripts/working_jira_bearer.py
+     ```
+
+4. **MCP protocol errors**
+   - Ensure you initialize the server before calling tools
+   - Check JSON-RPC 2.0 message format
+   - Verify all required parameters are provided
+
+### Process Management
+```bash
+# Find running server processes
+ps aux | grep jira_mcp_server
+
+# Kill specific process
+kill <PID>
+
+# Kill all JIRA MCP server processes
+pkill -f jira_mcp_server
+```
+
+### Checking Logs
+The server logs directly to stdout. Look for:
+- "Starting Simple JIRA MCP Server" - Server startup
+- "127.0.0.1 - POST /sse HTTP/1.1 200" - Successful requests
+- Error tracebacks for debugging issues
+
+## Architecture Notes
+
+### Why This Solution Works
+- **Single Process**: Unlike previous attempts with subprocess proxies, this runs as one process
+- **Global State**: Uses global MCP_INITIALIZED flag to maintain state across HTTP requests
+- **Direct HTTP**: Implements MCP protocol directly over HTTP rather than using complex transport layers
+- **Bearer Auth**: Uses Bearer token authentication which works with JIRA instances that disable Basic Auth
+
+### Files Created During Development
+- `jira_mcp_server.py` - Initial stdio-based MCP server
+- `jira_mcp_server_sse.py` - Failed SSE server attempt
+- `jira_mcp_http_server.py` - Flawed HTTP wrapper with subprocess
+- `jira_mcp_server_simple.py` - Final working solution ✓
+- `jira_mcp_test_client.py` - Test client ✓
+- `scripts/working_jira_bearer.py` - Reference JIRA auth ✓
+
+## Success Metrics
+When everything is working correctly:
+- Server starts without errors on port 8003
+- Test client shows all ✓ green checkmarks
+- Can retrieve issue NCS-8540 successfully
+- Can search for issues in SAFe Backlog status
+- Returns properly formatted JSON responses
+
+## Contact Configuration
+- JIRA Server: YOUR_JIRA_SERVER_URL_HERE
+- Test Issue: NCS-8540 ("Poc Scalling Ceph MDS")
+- Environment: llama_mcp_jira
+- Server Port: 8003
+- Protocol: MCP over HTTP/SSE 
+
+
+search for issues assignee for user tanny

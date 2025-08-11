@@ -1,0 +1,13 @@
+Application:
+  name: JiraApp
+  version: 1.0.0
+  description: JiraApp is a simple application that allows you to manage your Jira issues.
+  author: Stanny
+  email: stanny@redhat.com
+  mcp_servers_config: /home/stanny/projects/mcp_jira/Source/mcp_servers.example.yaml
+  llm_model: llama3.2:3b
+  llm_base_url: http://localhost:11434
+  llm_temperature: 0.0
+  llm_examples: /home/stanny/projects/mcp_jira/Source/Prompts/examples.txt
+  llm_template: /home/stanny/projects/mcp_jira/Source/Prompts/planner_prompt_template.txt
+    
