@@ -1,0 +1,4 @@
+podman run -it --rm --name debug_ollama --device /dev/dri docker.io/intelanalytics/ipex-llm-inference-cpp-xpu:latest /bin/bash
+
+podman build -t my-ollama-intel:latest .
+podman run -d --name ollama --replace --stop-signal=SIGKILL -p 127.0.0.1:11434:11434 -v ollama:/root/.ollama -e OLLAMA_INTEL_GPU=true -e ZES_ENABLE_SYSMAN=1 --device /dev/dri my-ollama-intel:latest
